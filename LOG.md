@@ -25,6 +25,112 @@
 
 ## 도출한 결과
 - THonny에 입력할 코드를 만들었다.
+- 코드 결과: 
+from machine import Pin, I2C
+from ssd1306 import SSD1306_I2C
+import time
+
+# 1. 준비물 목록
+PREPARATIONS = {
+    1: "Korean Book",
+    2: "Math Book",
+    3: "Pencil Case",
+    4: "Notebook"
+}
+
+# 2. 부품 설정
+i2c = I2C(0, sda=Pin(4), scl=Pin(5), freq=100000)
+oled = SSD1306_I2C(128, 64, i2c)
+
+green = Pin(16, Pin.IN, Pin.PULL_UP)
+red = Pin(17, Pin.IN, Pin.PULL_UP)
+led = Pin(18, Pin.OUT)
+
+# 3. 검사 상태
+scanning = False
+recognized = set()
+last_screen = None
+
+def display(lines):
+    global last_screen
+    lines = tuple(lines)
+    if lines == last_screen:
+        return
+
+    oled.fill(0)
+    for i, line in enumerate(lines[:6]):
+        oled.text(line[:16], 0, i * 10)
+    oled.show()
+    last_screen = lines
+
+def read_huskylens_ids():
+    # TODO: HUSKYLENS 드라이버 연결
+    # 현재 프레임에서 인식된 학습 ID 목록 반환
+    # 예: [1, 3]
+    return []
+
+def show_progress():
+    display([
+        "Scanning...",
+        "Found: {}/{}".format(
+            len(recognized), len(PREPARATIONS)
+        ),
+        "Press RED to end"
+    ])
+
+def show_result():
+    missing = [
+        name for item_id, name in PREPARATIONS.items()
+        if item_id not in recognized
+    ]
+
+    if not missing:
+        display([
+            "ALL READY!",
+            "Everything packed"
+        ])
+    else:
+        display(["MISSING ITEMS:"] + missing)
+
+# 시작 화면
+led.off()
+display(["READY"])
+
+# 버튼 이전 상태
+old_green = green.value()
+old_red = red.value()
+
+while True:
+    g = green.value()
+    r = red.value()
+
+    # 초록 버튼을 새로 눌렀을 때
+    if old_green == 1 and g == 0:
+        scanning = True
+        recognized.clear()
+        led.on()
+        display(["READY"])
+
+    # 인식 진행 중
+    if scanning:
+        ids = read_huskylens_ids()
+
+        for item_id in ids:
+            if item_id in PREPARATIONS:
+                if item_id not in recognized:
+                    recognized.add(item_id)
+                    show_progress()
+
+    # 빨간 버튼을 새로 눌렀을 때
+    if old_red == 1 and r == 0 and scanning:
+        scanning = False
+        led.off()
+        show_result()
+
+    old_green = g
+    old_red = r
+    time.sleep_ms(50)
+
 
 ## 다음시간에 할일
 - 허스키렌즈로 실제 물건들을 인식, 학습하고 버튼 모듈이랑 디스플레이가 오면 실제로 실습해봐야겠다.
